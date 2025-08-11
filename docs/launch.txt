@@ -1,0 +1,1926 @@
+# Hidden Spots V1 - Flutter Launch Guide (No Monetization for V1)
+
+**Current Date:** August 8, 2025
+**Developer:** @lorenzaparentado
+
+This comprehensive guide details how to build a Flutter web-first version of Hidden Spots using your existing Supabase schema, with future monetization in mind. V1 will focus on core functionality without payment gates, but the codebase will be structured to easily add Stripe and RevenueCat monetization in V2+.
+
+## 1. Project Setup with Flutter and Supabase
+
+### Step 1.1: Create Flutter Project
+```bash
+flutter create --platforms=web,android,ios hidden_spots
+cd hidden_spots
+```
+
+### Step 1.2: Add Dependencies to `pubspec.yaml`
+```yaml
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.5
+  
+  # Supabase
+  supabase_flutter: ^2.3.4
+  
+  # UI
+  flutter_map: ^6.1.0  # For OpenStreetMap
+  latlong2: ^0.9.0     # For coordinates
+  cached_network_image: ^3.3.1
+  shimmer: ^3.0.0
+  flutter_svg: ^2.0.9
+  lottie: ^3.0.0
+  
+  # Utils
+  intl: ^0.19.0
+  geolocator: ^10.1.0
+  image_picker: ^1.0.7
+  url_launcher: ^6.2.4
+  path_provider: ^2.1.2
+  share_plus: ^8.0.2
+  uuid: ^4.3.3
+  
+  # State management
+  provider: ^6.1.2
+  flutter_riverpod: ^2.5.1
+  
+  # For future monetization (commented out for V1)
+  # purchases_flutter: ^6.21.0
+  # flutter_stripe: ^10.0.0
+  
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.1
+```
+
+### Step 1.3: Create Config File
+Create `lib/config/app_config.dart`:
+
+```dart
+class AppConfig {
+  // Supabase
+  static const String supabaseUrl = 'https://tgtghiyqbejgnbpzokzb.supabase.co';
+  static const String supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRndGdoaXlxYmVqZ25icHpva3piIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQ2NTg2MzUsImV4cCI6MjA3MDIzNDYzNX0.3PfEWQJOSC586HihRvlOKi1-AEiFMjYAghI9Y2IfXo0';
+  
+  // App info
+  static const String appName = 'Hidden Spots';
+  static const String appVersion = '1.0.0';
+  
+  // Map
+  static const String mapboxAccessToken = 'YOUR_MAPBOX_TOKEN'; // Optional, can use OSM instead
+  static const double defaultLatitude = 39.9526; // Philadelphia
+  static const double defaultLongitude = -75.1652;
+  static const double defaultZoom = 13.0;
+  
+  // Feature flags - all enabled in V1, will be restricted in V2+
+  static const bool enableUnlimitedBookmarks = true;
+  static const bool enableEscapeNow = true;
+  static const bool enablePremiumSpots = true;
+  
+  // Default search radius (miles)
+  static const int defaultRadius = 5;
+  
+  // V2+ monetization configs (uncomment in V2)
+  // static const String revenueCatApiKey = 'YOUR_REVENUECAT_PUBLIC_API_KEY';
+  // static const String stripePubKey = 'YOUR_STRIPE_PUBLISHABLE_KEY';
+}
+```
+
+### Step 1.4: Initialize Supabase in `main.dart`
+```dart
+import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:hidden_spots/config/app_config.dart';
+import 'package:hidden_spots/screens/splash_screen.dart';
+import 'package:hidden_spots/theme/app_theme.dart';
+
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  
+  // Initialize Supabase
+  await Supabase.initialize(
+    url: AppConfig.supabaseUrl,
+    anonKey: AppConfig.supabaseAnonKey,
+  );
+  
+  runApp(const MyApp());
+}
+
+class MyApp extends StatelessWidget {
+  const MyApp({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      title: AppConfig.appName,
+      theme: AppTheme.lightTheme,
+      darkTheme: AppTheme.darkTheme,
+      themeMode: ThemeMode.system,
+      home: const SplashScreen(),
+    );
+  }
+}
+```
+
+## 2. Models
+
+### Step 2.1: Create Spot Model
+Create `lib/models/spot.dart`:
+
+```dart
+import 'package:supabase_flutter/supabase_flutter.dart';
+
+class Spot {
+  final String id;
+  final String title;
+  final String description;
+  final String category;
+  final double latitude;
+  final double longitude;
+  final String? imageUrl;
+  final DateTime createdAt;
+  final double? distanceMiles;
+  final bool isBookmarked;
+  final bool isVisited;
+  final int bookmarkCount;
+  final int visitCount;
+  final String? address;
+  final String city;
+
+  Spot({
+    required this.id,
+    required this.title,
+    required this.description,
+    required this.category,
+    required this.latitude,
+    required this.longitude,
+    this.imageUrl,
+    required this.createdAt,
+    this.distanceMiles,
+    this.isBookmarked = false,
+    this.isVisited = false,
+    this.bookmarkCount = 0,
+    this.visitCount = 0,
+    this.address,
+    this.city = 'Philadelphia',
+  });
+
+  factory Spot.fromJson(Map<String, dynamic> json) {
+    return Spot(
+      id: json['id'],
+      title: json['title'],
+      description: json['description'] ?? '',
+      category: json['category'],
+      latitude: json['latitude'],
+      longitude: json['longitude'],
+      imageUrl: json['image_url'],
+      createdAt: DateTime.parse(json['created_at']),
+      distanceMiles: json['distance_miles'],
+      isBookmarked: json['is_bookmarked'] ?? false,
+      isVisited: json['is_visited'] ?? false,
+      bookmarkCount: json['bookmark_count'] ?? 0,
+      visitCount: json['visit_count'] ?? 0,
+      address: json['address'],
+      city: json['city'] ?? 'Philadelphia',
+    );
+  }
+
+  // Helper method to get icon by category
+  IconData get categoryIcon {
+    switch (category) {
+      case 'quiet':
+        return Icons.volume_mute;
+      case 'nature':
+        return Icons.forest;
+      case 'art':
+        return Icons.palette;
+      case 'views':
+        return Icons.landscape;
+      default:
+        return Icons.location_on;
+    }
+  }
+
+  // Helper method to get color by category
+  Color get categoryColor {
+    switch (category) {
+      case 'quiet':
+        return Colors.blue;
+      case 'nature':
+        return Colors.green;
+      case 'art':
+        return Colors.purple;
+      case 'views':
+        return Colors.orange;
+      default:
+        return Colors.grey;
+    }
+  }
+}
+```
+
+### Step 2.2: Create UserProfile Model
+Create `lib/models/user_profile.dart`:
+
+```dart
+class UserProfile {
+  final String id;
+  final String email;
+  final String displayName;
+  final String subscriptionStatus;
+  final DateTime? subscriptionExpiresAt;
+  final bool trialUsed;
+  final int spotsAdded;
+  final int spotsVisited;
+  final int spotsBookmarked;
+  final int preferredRadius;
+  final bool notificationEnabled;
+
+  bool get isPro => subscriptionStatus == 'pro' && 
+    (subscriptionExpiresAt == null || subscriptionExpiresAt!.isAfter(DateTime.now()));
+  
+  bool get isInTrial => subscriptionStatus == 'trial' && 
+    subscriptionExpiresAt != null && subscriptionExpiresAt!.isAfter(DateTime.now());
+  
+  int get daysRemaining => subscriptionExpiresAt == null 
+    ? 0 
+    : subscriptionExpiresAt!.difference(DateTime.now()).inDays;
+
+  UserProfile({
+    required this.id,
+    required this.email,
+    required this.displayName,
+    required this.subscriptionStatus,
+    this.subscriptionExpiresAt,
+    required this.trialUsed,
+    required this.spotsAdded,
+    required this.spotsVisited,
+    required this.spotsBookmarked,
+    required this.preferredRadius,
+    required this.notificationEnabled,
+  });
+
+  factory UserProfile.fromJson(Map<String, dynamic> json) {
+    return UserProfile(
+      id: json['id'],
+      email: json['email'] ?? '',
+      displayName: json['display_name'] ?? 'User',
+      subscriptionStatus: json['subscription_status'] ?? 'free',
+      subscriptionExpiresAt: json['subscription_expires_at'] != null 
+        ? DateTime.parse(json['subscription_expires_at']) 
+        : null,
+      trialUsed: json['trial_used'] ?? false,
+      spotsAdded: json['spots_added'] ?? 0,
+      spotsVisited: json['spots_visited'] ?? 0,
+      spotsBookmarked: json['spots_bookmarked'] ?? 0,
+      preferredRadius: json['preferred_radius'] ?? 5,
+      notificationEnabled: json['notification_enabled'] ?? true,
+    );
+  }
+
+  // Default empty profile
+  factory UserProfile.empty() {
+    return UserProfile(
+      id: '',
+      email: '',
+      displayName: 'Guest',
+      subscriptionStatus: 'free',
+      subscriptionExpiresAt: null,
+      trialUsed: false,
+      spotsAdded: 0,
+      spotsVisited: 0,
+      spotsBookmarked: 0,
+      preferredRadius: 5,
+      notificationEnabled: true,
+    );
+  }
+}
+```
+
+## 3. Services
+
+### Step 3.1: Create Supabase Service
+Create `lib/services/supabase_service.dart`:
+
+```dart
+import 'dart:io';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:hidden_spots/models/spot.dart';
+import 'package:hidden_spots/models/user_profile.dart';
+import 'package:path/path.dart' as path;
+import 'package:hidden_spots/config/app_config.dart';
+
+class SupabaseService {
+  final SupabaseClient _supabase = Supabase.instance.client;
+
+  // Auth methods
+  Future<AuthResponse> signUp(String email, String password, String displayName) async {
+    final response = await _supabase.auth.signUp(
+      email: email,
+      password: password,
+      data: {'display_name': displayName},
+    );
+    return response;
+  }
+
+  Future<AuthResponse> signIn(String email, String password) async {
+    final response = await _supabase.auth.signInWithPassword(
+      email: email,
+      password: password,
+    );
+    return response;
+  }
+
+  Future<void> signOut() async {
+    await _supabase.auth.signOut();
+  }
+
+  User? getCurrentUser() {
+    return _supabase.auth.currentUser;
+  }
+
+  Stream<AuthState> authStateChanges() {
+    return _supabase.auth.onAuthStateChange;
+  }
+
+  // User profile methods
+  Future<UserProfile?> getUserProfile() async {
+    final user = _supabase.auth.currentUser;
+    if (user == null) return null;
+
+    final response = await _supabase
+      .from('profiles')
+      .select()
+      .eq('id', user.id)
+      .single();
+
+    return UserProfile.fromJson(response);
+  }
+
+  Future<void> updateUserProfile({
+    String? displayName,
+    int? preferredRadius,
+    bool? notificationEnabled,
+  }) async {
+    final user = _supabase.auth.currentUser;
+    if (user == null) throw Exception('User not authenticated');
+
+    final updates = <String, dynamic>{};
+    if (displayName != null) updates['display_name'] = displayName;
+    if (preferredRadius != null) updates['preferred_radius'] = preferredRadius;
+    if (notificationEnabled != null) updates['notification_enabled'] = notificationEnabled;
+    updates['updated_at'] = DateTime.now().toIso8601String();
+
+    await _supabase.from('profiles').update(updates).eq('id', user.id);
+  }
+
+  // Subscription check
+  // In V1, everyone will be on a 7-day trial by default
+  Future<Map<String, dynamic>> checkSubscriptionStatus() async {
+    final user = _supabase.auth.currentUser;
+    if (user == null) return {'is_pro': false, 'is_trial': false, 'days_remaining': 0};
+
+    final response = await _supabase
+        .rpc('check_subscription_status')
+        .select();
+
+    return response.first;
+  }
+
+  // Spot methods
+  Future<List<Spot>> getSpotsNearLocation({
+    required double latitude,
+    required double longitude,
+    int radius = 5,
+    String? category,
+    int limit = 50,
+  }) async {
+    final response = await _supabase.rpc(
+      'get_spots_near_location',
+      params: {
+        'user_lat': latitude,
+        'user_lng': longitude,
+        'radius_miles': radius,
+        'category_filter': category,
+        'limit_count': limit,
+      },
+    );
+
+    return response.map<Spot>((json) => Spot.fromJson(json)).toList();
+  }
+
+  Future<Spot> createSpot({
+    required String title,
+    required String description,
+    required String category,
+    required double latitude,
+    required double longitude,
+    File? imageFile,
+    String? address,
+  }) async {
+    final user = _supabase.auth.currentUser;
+    if (user == null) throw Exception('User not authenticated');
+
+    // Upload image if provided
+    String? imageUrl;
+    if (imageFile != null) {
+      final fileExt = path.extension(imageFile.path);
+      final fileName = '${DateTime.now().millisecondsSinceEpoch}$fileExt';
+      
+      final response = await _supabase.storage
+          .from('spot-images')
+          .upload(fileName, imageFile);
+      
+      if (response.contains('error')) {
+        throw Exception('Failed to upload image');
+      }
+      
+      imageUrl = _supabase.storage
+          .from('spot-images')
+          .getPublicUrl(fileName);
+    }
+
+    // Create spot record
+    final spotData = {
+      'title': title,
+      'description': description,
+      'category': category,
+      'latitude': latitude,
+      'longitude': longitude,
+      'created_by': user.id,
+      'image_url': imageUrl,
+      'address': address,
+    };
+
+    final response = await _supabase
+        .from('spots')
+        .insert(spotData)
+        .select()
+        .single();
+
+    return Spot.fromJson(response);
+  }
+
+  // Bookmark methods
+  Future<bool> toggleBookmark(String spotId) async {
+    final response = await _supabase.rpc(
+      'toggle_bookmark',
+      params: {'spot_id_param': spotId},
+    );
+    
+    return response as bool;
+  }
+
+  Future<List<Spot>> getUserBookmarks() async {
+    final user = _supabase.auth.currentUser;
+    if (user == null) throw Exception('User not authenticated');
+
+    final response = await _supabase
+        .from('bookmarks')
+        .select('spot_id, spots(*)')
+        .eq('user_id', user.id);
+
+    return response.map<Spot>((json) => 
+      Spot.fromJson({
+        ...json['spots'],
+        'is_bookmarked': true
+      })
+    ).toList();
+  }
+
+  // Visit methods
+  Future<bool> markSpotVisited(String spotId, {int? rating, String? notes}) async {
+    final response = await _supabase.rpc(
+      'mark_visited',
+      params: {
+        'spot_id_param': spotId,
+        'rating_param': rating,
+        'notes_param': notes
+      },
+    );
+    
+    return response as bool;
+  }
+
+  // Escape Now feature - will be premium in V2+
+  Future<Spot?> getEscapeNowSuggestion(double latitude, double longitude, {int maxDistance = 2}) async {
+    try {
+      final response = await _supabase.rpc(
+        'escape_now_suggestion',
+        params: {
+          'user_lat': latitude,
+          'user_lng': longitude,
+          'max_distance_miles': maxDistance,
+        },
+      );
+
+      if (response == null || (response is List && response.isEmpty)) {
+        return null;
+      }
+
+      return Spot.fromJson(response.first);
+    } catch (e) {
+      // In V1, we'll allow this even if the user isn't pro
+      if (e.toString().contains('Pro subscription required')) {
+        // In V1, call an alternative method
+        return getRandomNearbySpot(latitude, longitude, maxDistance);
+      }
+      rethrow;
+    }
+  }
+
+  // V1 fallback for non-pro users
+  Future<Spot?> getRandomNearbySpot(double latitude, double longitude, int maxDistance) async {
+    final spots = await getSpotsNearLocation(
+      latitude: latitude,
+      longitude: longitude,
+      radius: maxDistance,
+      limit: 10,
+    );
+
+    if (spots.isEmpty) return null;
+    
+    // Pick random spot
+    spots.shuffle();
+    return spots.first;
+  }
+}
+```
+
+### Step 3.2: Create Location Service
+Create `lib/services/location_service.dart`:
+
+```dart
+import 'package:geolocator/geolocator.dart';
+import 'package:hidden_spots/config/app_config.dart';
+
+class LocationService {
+  static Future<bool> checkLocationPermission() async {
+    bool serviceEnabled;
+    LocationPermission permission;
+
+    serviceEnabled = await Geolocator.isLocationServiceEnabled();
+    if (!serviceEnabled) {
+      return false;
+    }
+
+    permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
+      if (permission == LocationPermission.denied) {
+        return false;
+      }
+    }
+
+    if (permission == LocationPermission.deniedForever) {
+      return false;
+    }
+
+    return true;
+  }
+
+  static Future<Position?> getCurrentPosition() async {
+    try {
+      final hasPermission = await checkLocationPermission();
+      if (!hasPermission) return null;
+
+      return await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high,
+      );
+    } catch (e) {
+      print('Error getting location: $e');
+      return null;
+    }
+  }
+
+  static Future<Position> getDefaultPosition() async {
+    // Return default Philadelphia coordinates if location is not available
+    return Position(
+      latitude: AppConfig.defaultLatitude,
+      longitude: AppConfig.defaultLongitude,
+      timestamp: DateTime.now(),
+      accuracy: 0,
+      altitude: 0,
+      heading: 0,
+      speed: 0,
+      speedAccuracy: 0,
+      altitudeAccuracy: 0,
+      headingAccuracy: 0,
+    );
+  }
+}
+```
+
+## 4. State Management
+
+### Step 4.1: Create Auth Provider
+Create `lib/providers/auth_provider.dart`:
+
+```dart
+import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:hidden_spots/models/user_profile.dart';
+import 'package:hidden_spots/services/supabase_service.dart';
+
+class AuthProvider extends ChangeNotifier {
+  final SupabaseService _supabaseService = SupabaseService();
+  User? _user;
+  UserProfile? _profile;
+  bool _loading = false;
+  String? _error;
+
+  User? get user => _user;
+  UserProfile? get profile => _profile;
+  bool get isAuthenticated => _user != null;
+  bool get isLoading => _loading;
+  String? get error => _error;
+
+  bool get isPro => _profile?.isPro ?? false;
+  bool get isInTrial => _profile?.isInTrial ?? false;
+  int get daysRemaining => _profile?.daysRemaining ?? 0;
+
+  AuthProvider() {
+    _init();
+  }
+
+  void _init() async {
+    _user = _supabaseService.getCurrentUser();
+    
+    if (_user != null) {
+      await _loadUserProfile();
+    }
+    
+    // Listen for auth state changes
+    _supabaseService.authStateChanges().listen((event) async {
+      _user = event.session?.user;
+      
+      if (_user != null) {
+        await _loadUserProfile();
+      } else {
+        _profile = null;
+      }
+      
+      notifyListeners();
+    });
+  }
+
+  Future<void> _loadUserProfile() async {
+    try {
+      _profile = await _supabaseService.getUserProfile();
+      notifyListeners();
+    } catch (e) {
+      _error = 'Error loading profile: $e';
+      notifyListeners();
+    }
+  }
+
+  Future<bool> signIn(String email, String password) async {
+    try {
+      _loading = true;
+      _error = null;
+      notifyListeners();
+
+      final response = await _supabaseService.signIn(email, password);
+      _user = response.user;
+      await _loadUserProfile();
+      
+      _loading = false;
+      notifyListeners();
+      return true;
+    } catch (e) {
+      _loading = false;
+      _error = 'Login failed: ${e.toString()}';
+      notifyListeners();
+      return false;
+    }
+  }
+
+  Future<bool> signUp(String email, String password, String displayName) async {
+    try {
+      _loading = true;
+      _error = null;
+      notifyListeners();
+
+      final response = await _supabaseService.signUp(email, password, displayName);
+      _user = response.user;
+      
+      // Wait a moment for the profile creation trigger to run
+      await Future.delayed(const Duration(seconds: 1));
+      await _loadUserProfile();
+      
+      _loading = false;
+      notifyListeners();
+      return true;
+    } catch (e) {
+      _loading = false;
+      _error = 'Registration failed: ${e.toString()}';
+      notifyListeners();
+      return false;
+    }
+  }
+
+  Future<void> signOut() async {
+    try {
+      _loading = true;
+      _error = null;
+      notifyListeners();
+
+      await _supabaseService.signOut();
+      _user = null;
+      _profile = null;
+      
+      _loading = false;
+      notifyListeners();
+    } catch (e) {
+      _loading = false;
+      _error = 'Error signing out: ${e.toString()}';
+      notifyListeners();
+    }
+  }
+
+  Future<void> refreshProfile() async {
+    if (_user != null) {
+      await _loadUserProfile();
+    }
+  }
+
+  Future<void> updateProfile({
+    String? displayName,
+    int? preferredRadius,
+    bool? notificationEnabled,
+  }) async {
+    try {
+      _loading = true;
+      _error = null;
+      notifyListeners();
+
+      await _supabaseService.updateUserProfile(
+        displayName: displayName,
+        preferredRadius: preferredRadius,
+        notificationEnabled: notificationEnabled,
+      );
+      await _loadUserProfile();
+      
+      _loading = false;
+      notifyListeners();
+    } catch (e) {
+      _loading = false;
+      _error = 'Error updating profile: ${e.toString()}';
+      notifyListeners();
+    }
+  }
+}
+```
+
+### Step 4.2: Create Spots Provider
+Create `lib/providers/spots_provider.dart`:
+
+```dart
+import 'dart:io';
+import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:hidden_spots/models/spot.dart';
+import 'package:hidden_spots/services/supabase_service.dart';
+import 'package:hidden_spots/services/location_service.dart';
+
+class SpotsProvider extends ChangeNotifier {
+  final SupabaseService _supabaseService = SupabaseService();
+  List<Spot> _spots = [];
+  List<Spot> _bookmarkedSpots = [];
+  bool _loading = false;
+  String? _error;
+  String? _activeCategory;
+  Position? _userPosition;
+  int _searchRadius = 5; // miles
+
+  List<Spot> get spots => _spots;
+  List<Spot> get bookmarkedSpots => _bookmarkedSpots;
+  bool get isLoading => _loading;
+  String? get error => _error;
+  String? get activeCategory => _activeCategory;
+  Position? get userPosition => _userPosition;
+  int get searchRadius => _searchRadius;
+
+  SpotsProvider() {
+    _initUserLocation();
+  }
+
+  Future<void> _initUserLocation() async {
+    try {
+      _userPosition = await LocationService.getCurrentPosition();
+      if (_userPosition == null) {
+        _userPosition = await LocationService.getDefaultPosition();
+      }
+      loadNearbySpots();
+    } catch (e) {
+      _error = 'Error getting location: $e';
+      notifyListeners();
+    }
+  }
+
+  Future<void> loadNearbySpots() async {
+    if (_userPosition == null) await _initUserLocation();
+    
+    try {
+      _loading = true;
+      _error = null;
+      notifyListeners();
+
+      _spots = await _supabaseService.getSpotsNearLocation(
+        latitude: _userPosition!.latitude,
+        longitude: _userPosition!.longitude,
+        radius: _searchRadius,
+        category: _activeCategory,
+      );
+      
+      _loading = false;
+      notifyListeners();
+    } catch (e) {
+      _loading = false;
+      _error = 'Error loading spots: $e';
+      notifyListeners();
+    }
+  }
+
+  void setCategory(String? category) {
+    _activeCategory = category;
+    loadNearbySpots();
+  }
+
+  void setSearchRadius(int radius) {
+    _searchRadius = radius;
+    loadNearbySpots();
+  }
+
+  Future<void> setLocation(Position position) async {
+    _userPosition = position;
+    await loadNearbySpots();
+  }
+
+  Future<void> refreshCurrentLocation() async {
+    final position = await LocationService.getCurrentPosition();
+    if (position != null) {
+      await setLocation(position);
+    }
+  }
+
+  Future<void> loadBookmarkedSpots() async {
+    try {
+      _loading = true;
+      _error = null;
+      notifyListeners();
+
+      _bookmarkedSpots = await _supabaseService.getUserBookmarks();
+      
+      _loading = false;
+      notifyListeners();
+    } catch (e) {
+      _loading = false;
+      _error = 'Error loading bookmarks: $e';
+      notifyListeners();
+    }
+  }
+
+  Future<void> toggleBookmark(String spotId) async {
+    try {
+      final isBookmarked = await _supabaseService.toggleBookmark(spotId);
+      
+      // Update spot in current list
+      final index = _spots.indexWhere((spot) => spot.id == spotId);
+      if (index != -1) {
+        final updatedSpot = Spot(
+          id: _spots[index].id,
+          title: _spots[index].title,
+          description: _spots[index].description,
+          category: _spots[index].category,
+          latitude: _spots[index].latitude,
+          longitude: _spots[index].longitude,
+          imageUrl: _spots[index].imageUrl,
+          createdAt: _spots[index].createdAt,
+          distanceMiles: _spots[index].distanceMiles,
+          isBookmarked: isBookmarked,
+          isVisited: _spots[index].isVisited,
+          bookmarkCount: _spots[index].bookmarkCount + (isBookmarked ? 1 : -1),
+          visitCount: _spots[index].visitCount,
+        );
+        _spots[index] = updatedSpot;
+      }
+
+      // Update bookmarks list if needed
+      if (isBookmarked) {
+        // Add to bookmarks if not already there
+        if (!_bookmarkedSpots.any((spot) => spot.id == spotId)) {
+          if (index != -1) {
+            _bookmarkedSpots.add(_spots[index]);
+          }
+        }
+      } else {
+        // Remove from bookmarks
+        _bookmarkedSpots.removeWhere((spot) => spot.id == spotId);
+      }
+
+      notifyListeners();
+    } catch (e) {
+      _error = 'Error toggling bookmark: $e';
+      notifyListeners();
+    }
+  }
+
+  Future<void> markSpotVisited(String spotId, {int? rating, String? notes}) async {
+    try {
+      final wasNewVisit = await _supabaseService.markSpotVisited(
+        spotId, 
+        rating: rating, 
+        notes: notes,
+      );
+      
+      // Update spot in current list
+      final index = _spots.indexWhere((spot) => spot.id == spotId);
+      if (index != -1) {
+        final updatedSpot = Spot(
+          id: _spots[index].id,
+          title: _spots[index].title,
+          description: _spots[index].description,
+          category: _spots[index].category,
+          latitude: _spots[index].latitude,
+          longitude: _spots[index].longitude,
+          imageUrl: _spots[index].imageUrl,
+          createdAt: _spots[index].createdAt,
+          distanceMiles: _spots[index].distanceMiles,
+          isBookmarked: _spots[index].isBookmarked,
+          isVisited: true,
+          bookmarkCount: _spots[index].bookmarkCount,
+          visitCount: wasNewVisit ? _spots[index].visitCount + 1 : _spots[index].visitCount,
+        );
+        _spots[index] = updatedSpot;
+      }
+
+      // Also update in bookmarks list if present
+      final bookmarkIndex = _bookmarkedSpots.indexWhere((spot) => spot.id == spotId);
+      if (bookmarkIndex != -1) {
+        final updatedSpot = Spot(
+          id: _bookmarkedSpots[bookmarkIndex].id,
+          title: _bookmarkedSpots[bookmarkIndex].title,
+          description: _bookmarkedSpots[bookmarkIndex].description,
+          category: _bookmarkedSpots[bookmarkIndex].category,
+          latitude: _bookmarkedSpots[bookmarkIndex].latitude,
+          longitude: _bookmarkedSpots[bookmarkIndex].longitude,
+          imageUrl: _bookmarkedSpots[bookmarkIndex].imageUrl,
+          createdAt: _bookmarkedSpots[bookmarkIndex].createdAt,
+          isBookmarked: true,
+          isVisited: true,
+          bookmarkCount: _bookmarkedSpots[bookmarkIndex].bookmarkCount,
+          visitCount: wasNewVisit ? _bookmarkedSpots[bookmarkIndex].visitCount + 1 : _bookmarkedSpots[bookmarkIndex].visitCount,
+        );
+        _bookmarkedSpots[bookmarkIndex] = updatedSpot;
+      }
+
+      notifyListeners();
+    } catch (e) {
+      _error = 'Error marking spot visited: $e';
+      notifyListeners();
+    }
+  }
+
+  Future<Spot> addNewSpot({
+    required String title,
+    required String description,
+    required String category,
+    required double latitude,
+    required double longitude,
+    File? imageFile,
+    String? address,
+  }) async {
+    try {
+      _loading = true;
+      _error = null;
+      notifyListeners();
+
+      final newSpot = await _supabaseService.createSpot(
+        title: title,
+        description: description,
+        category: category,
+        latitude: latitude,
+        longitude: longitude,
+        imageFile: imageFile,
+        address: address,
+      );
+
+      // Add to current list if it's nearby
+      if (newSpot.distanceMiles == null || newSpot.distanceMiles! <= _searchRadius) {
+        _spots.insert(0, newSpot);
+      }
+      
+      _loading = false;
+      notifyListeners();
+      
+      return newSpot;
+    } catch (e) {
+      _loading = false;
+      _error = 'Error adding spot: $e';
+      notifyListeners();
+      rethrow;
+    }
+  }
+
+  Future<Spot?> getEscapeNowSuggestion() async {
+    try {
+      if (_userPosition == null) await _initUserLocation();
+      
+      _loading = true;
+      _error = null;
+      notifyListeners();
+
+      final suggestion = await _supabaseService.getEscapeNowSuggestion(
+        _userPosition!.latitude,
+        _userPosition!.longitude,
+      );
+      
+      _loading = false;
+      notifyListeners();
+      
+      return suggestion;
+    } catch (e) {
+      _loading = false;
+      _error = 'Error getting suggestion: $e';
+      notifyListeners();
+      return null;
+    }
+  }
+}
+```
+
+## 5. UI Components for Future Premium Features
+
+### Step 5.1: Create "Coming Soon" Badge
+Create `lib/widgets/coming_soon_badge.dart`:
+
+```dart
+import 'package:flutter/material.dart';
+
+class ComingSoonBadge extends StatelessWidget {
+  final String featureName;
+  
+  const ComingSoonBadge({
+    Key? key,
+    required this.featureName,
+  }) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: '$featureName will be a premium feature in V2',
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            colors: [Color(0xFF6A11CB), Color(0xFF2575FC)],
+            begin: Alignment.centerLeft,
+            end: Alignment.centerRight,
+          ),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: const Text(
+          'Free in Beta',
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: 10,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+      ),
+    );
+  }
+}
+```
+
+### Step 5.2: Create Spot Card Widget
+Create `lib/widgets/spot_card.dart`:
+
+```dart
+import 'package:flutter/material.dart';
+import 'package:hidden_spots/models/spot.dart';
+import 'package:cached_network_image/cached_network_image.dart';
+import 'package:shimmer/shimmer.dart';
+
+class SpotCard extends StatelessWidget {
+  final Spot spot;
+  final VoidCallback onTap;
+  final Function(String) onToggleBookmark;
+  final Function(String) onToggleVisited;
+
+  const SpotCard({
+    Key? key,
+    required this.spot,
+    required this.onTap,
+    required this.onToggleBookmark,
+    required this.onToggleVisited,
+  }) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      elevation: 2,
+      clipBehavior: Clip.antiAlias,
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: InkWell(
+        onTap: onTap,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Image
+            SizedBox(
+              height: 160,
+              width: double.infinity,
+              child: spot.imageUrl != null
+                ? CachedNetworkImage(
+                    imageUrl: spot.imageUrl!,
+                    fit: BoxFit.cover,
+                    placeholder: (context, url) => Shimmer.fromColors(
+                      baseColor: Colors.grey[300]!,
+                      highlightColor: Colors.grey[100]!,
+                      child: Container(color: Colors.white),
+                    ),
+                    errorWidget: (context, url, error) => Container(
+                      color: spot.categoryColor.withOpacity(0.2),
+                      child: Icon(spot.categoryIcon, size: 50, color: spot.categoryColor),
+                    ),
+                  )
+                : Container(
+                    color: spot.categoryColor.withOpacity(0.2),
+                    child: Icon(spot.categoryIcon, size: 50, color: spot.categoryColor),
+                  ),
+            ),
+            
+            Padding(
+              padding: const EdgeInsets.all(12.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Category
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: spot.categoryColor.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(spot.categoryIcon, size: 14, color: spot.categoryColor),
+                        const SizedBox(width: 4),
+                        Text(
+                          spot.category.toUpperCase(),
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                            color: spot.categoryColor,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  
+                  const SizedBox(height: 8),
+                  
+                  // Title
+                  Text(
+                    spot.title,
+                    style: Theme.of(context).textTheme.titleMedium,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  
+                  const SizedBox(height: 4),
+                  
+                  // Description
+                  Text(
+                    spot.description,
+                    style: Theme.of(context).textTheme.bodyMedium,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  
+                  const SizedBox(height: 8),
+                  
+                  // Distance and stats
+                  Row(
+                    children: [
+                      if (spot.distanceMiles != null) ...[
+                        Icon(Icons.near_me, size: 14, color: Theme.of(context).hintColor),
+                        const SizedBox(width: 4),
+                        Text(
+                          '${spot.distanceMiles!.toStringAsFixed(1)} mi',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Theme.of(context).hintColor,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                      ],
+                      
+                      Icon(Icons.bookmark, size: 14, color: Theme.of(context).hintColor),
+                      const SizedBox(width: 4),
+                      Text(
+                        '${spot.bookmarkCount}',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Theme.of(context).hintColor,
+                        ),
+                      ),
+                      
+                      const SizedBox(width: 12),
+                      
+                      Icon(Icons.visibility, size: 14, color: Theme.of(context).hintColor),
+                      const SizedBox(width: 4),
+                      Text(
+                        '${spot.visitCount}',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Theme.of(context).hintColor,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            
+            // Action buttons
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8.0),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  // Bookmark button
+                  IconButton(
+                    icon: Icon(
+                      spot.isBookmarked ? Icons.bookmark : Icons.bookmark_border,
+                      color: spot.isBookmarked ? Colors.amber : null,
+                    ),
+                    onPressed: () => onToggleBookmark(spot.id),
+                    tooltip: spot.isBookmarked ? 'Remove bookmark' : 'Bookmark',
+                  ),
+                  
+                  // Visited button
+                  IconButton(
+                    icon: Icon(
+                      spot.isVisited ? Icons.check_circle : Icons.check_circle_outline,
+                      color: spot.isVisited ? Colors.green : null,
+                    ),
+                    onPressed: () => onToggleVisited(spot.id),
+                    tooltip: spot.isVisited ? 'Marked as visited' : 'Mark as visited',
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+```
+
+### Step 5.3: Create "Escape Now" Screen
+Create `lib/screens/escape_now_screen.dart`:
+
+```dart
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:hidden_spots/providers/spots_provider.dart';
+import 'package:hidden_spots/models/spot.dart';
+import 'package:hidden_spots/widgets/coming_soon_badge.dart';
+import 'package:hidden_spots/screens/spot_detail_screen.dart';
+
+class EscapeNowScreen extends StatefulWidget {
+  const EscapeNowScreen({Key? key}) : super(key: key);
+
+  @override
+  _EscapeNowScreenState createState() => _EscapeNowScreenState();
+}
+
+class _EscapeNowScreenState extends State<EscapeNowScreen> {
+  Spot? _suggestion;
+  bool _loading = false;
+  String? _error;
+
+  Future<void> _getEscapeNowSuggestion() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+
+    try {
+      final suggestion = await context.read<SpotsProvider>().getEscapeNowSuggestion();
+      
+      setState(() {
+        _suggestion = suggestion;
+        _loading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _error = e.toString();
+        _loading = false;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Row(
+          children: const [
+            Text('Escape Now'),
+            SizedBox(width: 8),
+            ComingSoonBadge(featureName: 'Escape Now'),
+          ],
+        ),
+      ),
+      body: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Card(
+              elevation: 2,
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  children: const [
+                    Text(
+                      '✨ Need a quick getaway? ✨',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    SizedBox(height: 8),
+                    Text(
+                      'Let us suggest a hidden spot nearby for you to escape to right now!',
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            
+            const SizedBox(height: 24),
+            
+            if (_suggestion == null && !_loading && _error == null)
+              ElevatedButton.icon(
+                onPressed: _getEscapeNowSuggestion,
+                icon: const Icon(Icons.explore),
+                label: const Text('Find me a spot to escape to'),
+                style: ElevatedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                ),
+              ),
+              
+            if (_loading)
+              const Center(
+                child: Column(
+                  children: [
+                    CircularProgressIndicator(),
+                    SizedBox(height: 16),
+                    Text('Finding the perfect escape for you...'),
+                  ],
+                ),
+              ),
+              
+            if (_error != null)
+              Center(
+                child: Column(
+                  children: [
+                    Icon(Icons.error_outline, color: Colors.red, size: 48),
+                    const SizedBox(height: 16),
+                    Text(
+                      'Oops! Something went wrong:',
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
+                    const SizedBox(height: 8),
+                    Text(_error!),
+                    const SizedBox(height: 24),
+                    ElevatedButton(
+                      onPressed: _getEscapeNowSuggestion,
+                      child: const Text('Try Again'),
+                    ),
+                  ],
+                ),
+              ),
+              
+            if (_suggestion != null)
+              Expanded(
+                child: Column(
+                  children: [
+                    const Text(
+                      'We found the perfect escape for you!',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    
+                    // Suggestion card
+                    Expanded(
+                      child: Card(
+                        elevation: 3,
+                        clipBehavior: Clip.antiAlias,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            // Image
+                            Expanded(
+                              child: _suggestion!.imageUrl != null
+                                ? Image.network(
+                                    _suggestion!.imageUrl!,
+                                    fit: BoxFit.cover,
+                                  )
+                                : Container(
+                                    color: _suggestion!.categoryColor.withOpacity(0.2),
+                                    child: Center(
+                                      child: Icon(
+                                        _suggestion!.categoryIcon,
+                                        size: 64,
+                                        color: _suggestion!.categoryColor,
+                                      ),
+                                    ),
+                                  ),
+                            ),
+                            
+                            Padding(
+                              padding: const EdgeInsets.all(16.0),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  // Category
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                    decoration: BoxDecoration(
+                                      color: _suggestion!.categoryColor.withOpacity(0.2),
+                                      borderRadius: BorderRadius.circular(16),
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(_suggestion!.categoryIcon, size: 14, color: _suggestion!.categoryColor),
+                                        const SizedBox(width: 4),
+                                        Text(
+                                          _suggestion!.category.toUpperCase(),
+                                          style: TextStyle(
+                                            fontSize: 10,
+                                            fontWeight: FontWeight.bold,
+                                            color: _suggestion!.categoryColor,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  
+                                  const SizedBox(height: 8),
+                                  
+                                  // Title
+                                  Text(
+                                    _suggestion!.title,
+                                    style: Theme.of(context).textTheme.titleLarge,
+                                  ),
+                                  
+                                  const SizedBox(height: 8),
+                                  
+                                  // Description
+                                  Text(_suggestion!.description),
+                                  
+                                  const SizedBox(height: 16),
+                                  
+                                  if (_suggestion!.distanceMiles != null)
+                                    Text(
+                                      'Distance: ${_suggestion!.distanceMiles!.toStringAsFixed(1)} miles away',
+                                      style: const TextStyle(fontWeight: FontWeight.bold),
+                                    ),
+                                    
+                                  const SizedBox(height: 16),
+                                  
+                                  // Buttons
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        child: ElevatedButton.icon(
+                                          onPressed: () {
+                                            Navigator.push(
+                                              context,
+                                              MaterialPageRoute(
+                                                builder: (context) => SpotDetailScreen(spot: _suggestion!),
+                                              ),
+                                            );
+                                          },
+                                          icon: const Icon(Icons.navigation),
+                                          label: const Text('Go There'),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      ElevatedButton.icon(
+                                        onPressed: () {
+                                          setState(() {
+                                            _suggestion = null;
+                                          });
+                                          _getEscapeNowSuggestion();
+                                        },
+                                        icon: const Icon(Icons.refresh),
+                                        label: const Text('Try Another'),
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: Colors.grey[300],
+                                          foregroundColor: Colors.black87,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+```
+
+### Step 5.4: Create "Coming Soon" Screen
+Create `lib/screens/coming_soon_screen.dart`:
+
+```dart
+import 'package:flutter/material.dart';
+
+class ComingSoonScreen extends StatelessWidget {
+  const ComingSoonScreen({Key? key}) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Coming in V2'),
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Hidden Spots V2: Coming Soon',
+              style: TextStyle(
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'We\'re working on exciting new features for Hidden Spots! Version 2 will introduce our premium plan with enhanced features for power users.',
+              style: TextStyle(
+                fontSize: 16,
+                color: Colors.grey[700],
+              ),
+            ),
+            const SizedBox(height: 32),
+            
+            // Timeline
+            _buildTimelineItem(
+              context,
+              title: 'V1 - Where we are now (Free Beta)',
+              isCurrent: true,
+              content: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: const [
+                  FeatureItem(text: 'Discover hidden spots in Philadelphia', isAvailable: true),
+                  FeatureItem(text: 'Add your own hidden spots', isAvailable: true),
+                  FeatureItem(text: 'Unlimited bookmarks (during beta)', isAvailable: true),
+                  FeatureItem(text: 'Escape Now feature (during beta)', isAvailable: true),
+                  FeatureItem(text: 'All features free during beta period', isAvailable: true),
+                ],
+              ),
+            ),
+            
+            _buildTimelineConnector(),
+            
+            _buildTimelineItem(
+              context,
+              title: 'V2 - Coming Q1 2026',
+              isCurrent: false,
+              content: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildPlanBadge('Premium Plan', isPremium: true),
+                  const Text(
+                    '\$2.99/month or \$24.99/year',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 8),
+                  const FeatureItem(text: 'Unlimited bookmarks', isPremium: true),
+                  const FeatureItem(text: 'Escape Now suggestions', isPremium: true),
+                  const FeatureItem(text: 'Premium spot access', isPremium: true),
+                  const FeatureItem(text: 'Advanced filters', isPremium: true),
+                  const FeatureItem(text: 'Ad-free experience', isPremium: true),
+                  
+                  const SizedBox(height: 16),
+                  _buildPlanBadge('Free Plan', isPremium: false),
+                  const SizedBox(height: 8),
+                  const FeatureItem(text: 'Limited to 20 bookmarks', isAvailable: true),
+                  const FeatureItem(text: 'Basic spot access', isAvailable: true),
+                  const FeatureItem(text: 'Standard filters', isAvailable: true),
+                  const FeatureItem(text: 'No Escape Now feature', isAvailable: false),
+                  const FeatureItem(text: 'Ads may be displayed', isAvailable: false),
+                ],
+              ),
+            ),
+            
+            const SizedBox(height: 32),
+            
+            // Sign up form
+            Card(
+              elevation: 2,
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    const Text(
+                      'Be the first to know when V2 launches',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    TextField(
+                      decoration: InputDecoration(
+                        labelText: 'Your Email',
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    ElevatedButton(
+                      onPressed: () {},
+                      child: const Text('Keep Me Updated'),
+                      style: ElevatedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTimelineItem(
+    BuildContext context, {
+    required String title,
+    required bool isCurrent,
+    required Widget content,
+  }) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Column(
+          children: [
+            Container(
+              width: 20,
+              height: 20,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: isCurrent ? Theme.of(context).primaryColor : Colors.grey[400],
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(width: 16),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: isCurrent ? Theme.of(context).primaryColor : Colors.black,
+                ),
+              ),
+              const SizedBox(height: 8),
+              content,
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildTimelineConnector() {
+    return Padding(
+      padding: const EdgeInsets.only(left: 10),
+      child: SizedBox(
+        height: 30,
+        child: VerticalDivider(
+          color: Colors.grey[400],
+          thickness: 2,
+          width: 20,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPlanBadge(String text, {required bool isPremium}) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+      decoration: BoxDecoration(
+        gradient: isPremium
+            ? const LinearGradient(
+                colors: [Color(0xFF6A11CB), Color(0xFF2575FC)],
+                begin: Alignment.centerLeft,
+                end: Alignment.centerRight,
+              )
+            : null,
+        color: isPremium ? null : Colors.grey[200],
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Text(
+        text,
+        style: TextStyle(
+          fontSize: 14,
+          fontWeight: FontWeight.bold,
+          color: isPremium ? Colors.white : Colors.black87,
+        ),
+      ),
+    );
+  }
+}
+
+class FeatureItem extends StatelessWidget {
+  final String text;
+  final bool isAvailable;
+  final bool isPremium;
+
+  const FeatureItem({
+    Key? key,
+    required this.text,
+    this.isAvailable = false,
+    this.isPremium = false,
+  }) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4.0),
+      child: Row(
+        children: [
+          Icon(
+            isAvailable ? Icons.check_circle : Icons.cancel,
+            color: isAvailable ? Colors.green : Colors.red,
+            size: 20,
+          ),
+          if (isPremium)
+            const Icon(
+              Icons.star,
+              color: Colors.amber,
+              size: 20,
+            ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              text,
+              style: TextStyle(
+                fontWeight: isPremium ? FontWeight.bold : FontWeight.normal,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+```
+
+## 6. Seed 20+ Spots in Philadelphia
+
+### Step 6.1: Create Seeding Functionality
+Create `lib/utils/seed_data.dart`:
+
+```dart
+import 'package:supabase_flutter/supabase_flutter.dart';
+
+class SeedData {
+  static final List<Map<String, dynamic>> philadelphiaSpots = [
+    {
+      'title': 'Love Park Fountain',
+      'description': 'Iconic LOVE sculpture and fountain, perfect for people watching and photos',
+      'category': 'views',
+      'latitude': 39.9544,
+      'longitude': -75.1653,
+    },
+    {
+      'title': 'Rittenhouse Square Reading Nook',
+      'description': 'Quiet bench under old oak trees, ideal for reading and reflection',
+      'category': 'quiet',
+      'latitude': 39.9495,
+      'longitude': -75.1695,
+    },
+    {
+      'title': 'Magic Gardens Hidden Corner',
+      'description': 'Lesser-known mosaic alcove behind the main Magic Gardens installation',
+      'category': 'art',
+      'latitude': 39.9420,
+      'longitude': -75.1590,
+    },
+    {
+      'title': 'Schuylkill River Trail Overlook',
+      'description': 'Peaceful spot with river views, great for morning walks',
+      'category': 'nature',
+      'latitude': 39.9459,
+      'longitude': -75.1816,
+    },
+    {
+      'title': 'Washington Square Park Corner',
+      'description': 'Quiet corner away from crowds, perfect for journaling',
+      'category': 'quiet',
+      'latitude': 39.9475,
+      'longitude': -75.1526,
+    },
+    // Penn's Landing Sunset Point
+    {
+      'title': 'Penn\'s Landing Sunset Point',
+      'description': 'Best sunset views over the Delaware River',
+      'category': 'views',
+      'latitude': 39.9495,
+      'longitude': -75.1394,
+    },
+    // Fairmount Park Hidden Grove
+    {
+      'title': 'Fairmount Park Hidden Grove',
+      'description': 'Secluded area surrounded by old growth trees',
+      'category': 'nature',
+      'latitude': 39.9815,
+      'longitude': -75.2095,
+    },
+    // Reading Terminal Quiet Corner
+    {
+      'title': 'Reading Terminal Quiet Corner',
+      'description': 'Less crowded seating area perfect for a peaceful lunch',
+      'category': 'quiet',
+      'latitude': 39.9531,
+      'longitude': -75.1600,
+    },
+    // University City
+    {
+      'title': 'Penn Museum Garden',
+      'description': 'Peaceful garden behind the museum with ancient artifacts',
+      'category': 'quiet',
+      'latitude': 39.9491,
+      'longitude': -75.1915,
+    },
+    {
+      'title': 'Drexel Quad Hidden Bench',
+      'description': 'Secluded bench under large trees, perfect study spot',
+      'category': 'quiet',
+      'latitude': 39.9558,
+      'longitude': -75.1887,
+    },
+    // Northern Liberties
+    {
+      'title': 'Liberty Lands Park Nook',
+      'description': 'Community garden corner with great sunlight and privacy',
+      'category': 'nature',
+      'latitude': 39.9650,
+      'longitude': -75.1452,
+    },
+    {
+      'title': 'Schmidt\'s Commons Secret Spot',
+      'description': 'Hidden seating area with great people watching',
+      'category': 'views',
+      'latitude': 39.9642,
+      'longitude': -75.1425,
+    },
+    // Fishtown
+    {
+      'title': 'Frankford Ave Mural Alley',
+      'description': 'Amazing street art in a quiet alley off Frankford Avenue',
+      'category': 'art',
+      'latitude': 39.9731,
+      'longitude': -75.1345,
+    },
+    {
+      'title': 'Penn Treaty Park Riverside',
+      'description

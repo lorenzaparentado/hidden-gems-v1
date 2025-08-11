@@ -1,0 +1,112 @@
+Hidden Spots App - SLC (Simple Launch Candidate)
+Core SLC Features (Must-Have for Launch)
+🏠 Home Screen
+Spot Feed: Simple list/card view of 5-10 recent spots
+Basic Categories: Just 4 main filters (Quiet, Nature, Art, Views)
+Add Spot button prominently placed
+🗺️ Map View
+Simple Map: Google Maps with colored pins by category
+Tap Pin: Show basic spot info (title, photo, category)
+Current Location: Center map on user's location
+Category Toggle: Show/hide pins by the 4 main categories
+➕ Add a Spot (Simplified)
+Required Fields Only:
+Spot name
+One photo
+Category selection (dropdown)
+Auto-location pin (no manual placement)
+Brief description (100 chars max)
+Basic Validation: Simple keyword filter to block obvious businesses
+No Manual Review: Auto-publish with user reporting system
+📌 My Spots
+Saved List: Simple bookmarked spots (max 20 for free tier)
+Visited Tracking: Basic checkmark system
+My Contributions: Spots the user has added
+👤 Basic Profile
+Stats Only: Spots added, spots visited, spots saved
+No Social Features: Skip friends, comments, ratings for SLC
+💰 Simple Freemium Model (V1)
+Free Tier:
+View/explore all spots (unlimited)
+Bookmark up to 20 spots
+Add unlimited spots
+Basic map view
+Pro Tier ($2.99/month or $24/year):
+Unlimited bookmarks
+"Escape Now" button (instant nearby suggestion)
+Advanced filters (quiet/social, distance radius)
+Offline spot downloads (basic)
+Priority support
+Simple Paywall: Stripe/RevenueCat integration
+Free Trial: 7-day Pro trial for new users
+What's NOT in the SLC
+❌ Cut from V1
+AI recommendations
+Custom collections/lists
+Social features (following, sharing, leaderboards)
+Sponsored content
+Manual moderation queue
+Duplicate detection system
+Push notifications
+Complex offline functionality
+Multiple photo uploads per spot
+❌ Simplified UX Decisions
+No Search Bar: Just categories and map browsing
+No Complex Validation: Basic keyword filter only
+No User Accounts Initially: Use device storage, add auth later
+Single Photo Per Spot: No photo galleries
+Fixed Categories: No custom tags or user-defined categories
+SLC Success Metrics
+Week 1-2 Goals
+20 spots seeded by you
+5 friends successfully add spots
+Payment system working (test transactions)
+App doesn't crash on basic use
+Month 1 Goals
+50+ spots in Philadelphia area
+20+ active users (friends, classmates)
+10+ user-contributed spots
+Revenue Goal: 2-3 Pro subscribers ($6-9 MRR)
+Basic functionality working smoothly
+Month 2-3 Goals
+100+ spots
+50+ users
+Revenue Goal: 5-10 Pro subscribers ($15-30 MRR)
+10%+ conversion rate to Pro trial
+Users starting to visit/bookmark spots regularly
+Clear signal: Will people pay for this?
+Tech Stack (Minimal)
+Frontend
+Flutter for cross-platform mobile
+Basic State Management (Provider or Riverpod)
+Backend
+Supabase (free tier):
+Database for spots
+Image storage
+User authentication (required for Pro subscriptions)
+Google Maps API (free tier covers early usage)
+Stripe/RevenueCat: Subscription management and payments
+Storage Strategy
+User Accounts Required: Need authentication for subscription management
+Cloud-First: Store bookmarks, Pro status in Supabase
+Local Caching: Cache user data for performance
+Launch Strategy (Simplified)
+Pre-Launch (Week 1)
+Build SLC features
+Seed 20 spots yourself around Philadelphia
+Test with 2-3 close friends
+Soft Launch (Week 2-4)
+Share with 10-15 friends/classmates
+Ask each to add 1-2 spots
+Gather feedback, fix critical bugs
+Campus Launch (Month 2)
+Share in student Discord/Slack channels
+Post in relevant Reddit communities (r/philadelphia, r/Drexel)
+Focus on getting to 50+ spots before expanding
+Why This SLC Works
+Proves Core Value: Can people find and enjoy hidden spots?
+Simple to Build: 4-6 weeks of development max
+Easy to Test: Clear success/failure signals
+Foundation for Growth: Everything else builds on this base
+The key insight: Start with discovery, not features. If people don't love finding and visiting spots, no amount of advanced filtering or social features will save the app.
+

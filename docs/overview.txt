@@ -1,0 +1,339 @@
+Hidden Spots App - Complete Design Brief
+Overall Design Philosophy
+Core Aesthetic: Cozy, calm exploration app inspired by hiking/GORP culture meets urban journaling Visual Mood: Peaceful, inviting, discovery-focused - like a digital field guide for city exploration User Emotion: Should make users feel curious, relaxed, and excited to explore their surroundings
+
+Global Design System
+Color Palette
+Primary Colors:
+Forest Green: #2D5A3D (primary actions, active states)
+Sage Green: #7BA05B (secondary elements, success states)
+Warm Beige: #F5F1E8 (backgrounds, cards)
+Soft Cream: #FDFCF8 (main background)
+Supporting Colors:
+Dusty Blue: #5B7C99 (quiet category)
+Terracotta: #B5704D (art category)
+Forest Brown: #6B4E3D (nature category)
+Golden Yellow: #D4A574 (views category)
+Neutral Colors:
+Charcoal: #2C2C2C (primary text)
+Medium Gray: #6B6B6B (secondary text)
+Light Gray: #E5E5E5 (dividers, borders)
+Error Red: #C85A54 (errors, warnings)
+Typography
+Primary Font: SF Pro Display (iOS) / Roboto (Android)
+Headings: Medium weight, 18-24pt
+Body Text: Regular weight, 14-16pt
+Captions: Regular weight, 12pt
+Hierarchy:
+H1: 24pt, Medium, Charcoal
+H2: 20pt, Medium, Charcoal
+H3: 18pt, Medium, Charcoal
+Body: 16pt, Regular, Charcoal
+Caption: 12pt, Regular, Medium Gray
+Spacing & Layout
+Grid: 16px base unit
+Small spacing: 8px
+Medium spacing: 16px
+Large spacing: 24px
+Section spacing: 32px
+Borders & Radius:
+Card radius: 12px
+Button radius: 8px
+Input radius: 8px
+Border width: 1px, Light Gray
+
+Screen-by-Screen Design Specifications
+1. Splash/Loading Screen
+Layout:
+Full screen gradient background (Soft Cream to Warm Beige)
+Centered app logo/icon (illustrated compass or map pin with nature elements)
+App name "Hidden Spots" below logo in H1 style
+Small loading spinner at bottom
+Tagline: "Discover your city's secret corners" in caption style
+Aesthetic:
+Minimal, calming
+Hand-drawn illustration style for logo
+Subtle animation: logo gently fades in, spinner rotates
+
+2. Authentication Screens (Login/Signup)
+Layout:
+Top 1/3: Hero illustration of person sitting in peaceful urban spot (park bench, rooftop, etc.)
+Middle 1/3: Form fields with generous spacing
+Bottom 1/3: Action buttons and secondary links
+Sign Up Screen:
+Welcome headline: "Start discovering hidden gems"
+Form fields: Email, Password, Display Name
+Primary button: "Start exploring" (Forest Green)
+Secondary link: "Already have an account? Sign in"
+Login Screen:
+Welcome back headline: "Welcome back, explorer"
+Form fields: Email, Password
+Primary button: "Sign in" (Forest Green)
+Secondary link: "Don't have an account? Sign up"
+Aesthetic:
+Clean, friendly forms
+Soft shadows on input fields
+Illustration style: watercolor/gouache feel
+Error states use Error Red with gentle messaging
+
+3. Home/Feed Screen
+Layout:
+[Header: "Hidden Spots" + Profile Icon]
+[Category Filter Pills: All | Quiet | Nature | Art | Views]
+[Spot Cards Feed - vertical scroll]
+[Floating Action Button: + Add Spot]
+Category Filter Pills:
+Horizontal scrolling pill buttons
+Active state: category color background + white text
+Inactive state: transparent background + category color border + category color text
+Icons for each category (leaf, eye, palette, mountain)
+Spot Cards:
+Card Style: Rounded corners (12px), subtle shadow, Warm Beige background
+Layout:
+Top: Full-width image (aspect ratio 16:9) with category color overlay in corner
+Middle: Title (H3) + distance + category pill
+Bottom: Description preview (2 lines) + bookmark icon + visit checkmark
+Card Interactions:
+Subtle scale animation on tap
+Bookmark icon: heart outline → filled heart (category color)
+Visit checkmark: gray → Forest Green when marked visited
+Floating Action Button:
+Forest Green background
+White "+" icon
+Positioned bottom-right with 16px margin
+Subtle shadow
+Aesthetic:
+Card-based feed feels like a scrapbook
+Soft shadows create depth without being harsh
+Category colors create visual rhythm
+Warm, inviting photography style for spot images
+
+4. Map Screen
+Layout:
+[Google Maps full screen]
+[Category Filter Overlay - top edge]
+[Current Location Button - bottom right]
+[Spot Detail Sheet - slides up from bottom when pin tapped]
+Map Styling:
+Custom Google Maps style: muted colors, reduced visual noise
+Green spaces slightly emphasized
+Urban areas in soft grays and beiges
+Map Pins:
+Custom designed pins for each category
+Quiet: Dusty Blue with book/meditation icon
+Nature: Forest Brown with leaf icon
+Art: Terracotta with palette icon
+Views: Golden Yellow with eye/camera icon
+Clustered pins: show count in Forest Green circle
+Spot Detail Sheet:
+Slides up from bottom when pin tapped
+Content: Image + title + description + bookmark/visit buttons
+Styling: Rounded top corners, Warm Beige background
+Buttons:
+"Get Directions" (Forest Green, filled)
+Bookmark toggle (heart icon)
+"Mark as Visited" (outline button)
+Aesthetic:
+Map feels integrated, not like standard Google Maps
+Pins have personality and are easily distinguishable
+Sheet interaction feels smooth and native
+
+5. Add Spot Screen
+Layout:
+[Header: "Add a Hidden Spot" + Cancel/Save]
+[Photo Upload Area - large, centered]
+[Form Fields with generous spacing]
+[Save Button - bottom, full width]
+Photo Upload Area:
+Large dashed border rectangle in Light Gray
+Camera icon + "Add Photo" text when empty
+Full image preview when photo selected
+Corner "X" button to remove photo
+Form Fields:
+Spot Name: Single line input
+Category: Horizontal pills (same style as filters, single select)
+Description: Multi-line text area
+Location: Auto-detected with map preview thumbnail
+Validation Design:
+Real-time validation with gentle error messages
+Invalid fields show Error Red border + error text below
+Business name warning: gentle orange banner with "This looks like a business name..."
+Save Button:
+Full-width at bottom
+Forest Green background
+"Add to Hidden Spots" text
+Disabled state: Light Gray background
+Aesthetic:
+Form feels approachable, not intimidating
+Clear visual hierarchy guides user through process
+Validation feels helpful, not punishing
+
+6. Spot Detail Screen
+Layout:
+[Full-width hero image with back button overlay]
+[Content Section: Title + Category + Distance]
+[Description text block]
+[Action Buttons: Bookmark + Directions + Mark Visited]
+[Map thumbnail showing location]
+[User Stats: Added by X, Y visits, Z bookmarks]
+Hero Image:
+Full-width, aspect ratio 4:3
+Gradient overlay at bottom for text readability
+Back arrow (white) in top-left corner
+Category pill in top-right corner
+Content Layout:
+Title: H1 style, Charcoal
+Meta info: Distance + category + time added (caption style)
+Description: Body text, Medium Gray
+Action buttons: Row of 3 buttons with icons
+Action Buttons:
+Bookmark: Heart icon + "Save" (outline style, becomes filled when saved)
+Directions: Navigation icon + "Directions" (Forest Green filled)
+Visit: Checkmark icon + "Mark Visited" (outline → filled transition)
+Map Thumbnail:
+Rounded corners, shows spot location with custom pin
+Tappable to expand to full map view
+Aesthetic:
+Feels like a travel guide entry
+Photography is the hero element
+Clean information hierarchy
+Actions are clear and accessible
+
+7. Bookmarks/Saved Spots Screen
+Layout:
+[Header: "Your Saved Spots" + Filter options]
+[Search bar]
+[Grid/List toggle]
+[Saved spots in grid or list format]
+Grid View:
+2 columns on mobile, 3+ on tablet
+Square aspect ratio cards
+Image + title + distance overlay
+Visited checkmark overlay for visited spots
+List View:
+Similar to home feed cards but more compact
+Horizontal layout: Image (left) + Content (right)
+Shows more metadata (date saved, last visited)
+Filter Options:
+Dropdown: "All | Visited | Not Visited"
+Category pills same as home screen
+Empty State:
+Illustration of person with empty backpack
+"No saved spots yet" headline
+"Start exploring to save your favorite hidden gems" subtext
+"Discover Spots" button
+Aesthetic:
+Feels like a personal collection/scrapbook
+Grid view emphasizes visual discovery
+List view emphasizes information density
+
+8. Profile Screen
+Layout:
+[Header with user info + settings icon]
+[Subscription Status card]
+[Stats grid: Spots Added | Visited | Saved]
+[Menu items: My Contributions, Settings, Help, Sign Out]
+User Header:
+Circular avatar placeholder (user initials)
+Display name (H2)
+Join date (caption)
+Settings gear icon (top-right)
+Subscription Status Card:
+Free users: Upgrade prompt with Pro benefits
+Trial users: Days remaining with upgrade CTA
+Pro users: Pro badge + renewal date
+Stats Grid:
+3 columns showing key metrics
+Each stat: Number (large) + Label (caption)
+Tappable to show related content
+Menu Items:
+Clean list design with icons
+My Contributions: Shows spots user has added
+Settings: App preferences
+Help & Support: FAQ, contact
+Sign Out: At bottom, destructive style
+Aesthetic:
+Professional but friendly
+Clear information hierarchy
+Pro features prominently displayed for conversion
+
+9. Paywall Screen
+Layout:
+[Close button - top left]
+[Feature illustration + headline]
+[Benefits list with checkmarks]
+[Pricing cards]
+[Purchase buttons]
+[Restore purchases link]
+Hero Section:
+Custom illustration showing premium features
+Headline: "Unlock Pro Features"
+Subheading: "Get the most out of Hidden Spots"
+Benefits List:
+Checkmark icons (Forest Green) + benefit descriptions
+Benefits: Unlimited Bookmarks, Escape Now, Advanced Filters, Offline Access
+Clear, benefit-focused copy
+Pricing Cards:
+Monthly: $2.99/month card
+Annual: $24.99/year card with "POPULAR" badge
+Annual card slightly larger and highlighted
+Both show price + billing period clearly
+Purchase Buttons:
+Full-width for each option
+Forest Green for annual (recommended)
+Sage Green for monthly
+Loading state during purchase
+Aesthetic:
+Feels valuable, not pushy
+Benefits clearly communicated
+Pricing is transparent and fair
+Professional but friendly tone
+
+10. Map Pin & Clustering Design
+Individual Pins:
+Base shape: Rounded rectangle with pointed bottom (like a location tag)
+Size: 32x40px for normal zoom, scales with zoom level
+Shadow: Subtle drop shadow for depth
+Category-Specific Pins:
+Quiet: Dusty Blue background + white book icon
+Nature: Forest Brown background + white leaf icon
+Art: Terracotta background + white palette icon
+Views: Golden Yellow background + white camera icon
+Clustered Pins:
+Circular background in Forest Green
+White number showing count of spots
+Slightly larger than individual pins
+Tap to expand cluster
+Pin States:
+Normal: Full opacity, standard size
+Selected: Slightly larger, brighter colors
+Visited: Subtle checkmark overlay in corner
+
+Component Interactions & Animations
+Micro-Interactions:
+Button taps: Gentle scale down (0.95x) with haptic feedback
+Card taps: Subtle scale up (1.02x) with shadow increase
+Bookmark toggle: Heart fills with color animation
+Category pills: Smooth color transition when selected
+Loading states: Skeleton screens with gentle shimmer
+Page Transitions:
+Screen changes: Slide transitions (left/right)
+Modal sheets: Slide up from bottom
+Detail views: Push/pop with fade
+Map interactions: Smooth camera movements
+Success States:
+Spot added: Green checkmark animation + "Spot added!" toast
+Purchase complete: Confetti animation + success message
+Location found: Gentle pulse on map pin
+
+Accessibility Considerations
+Color contrast: All text meets WCAG AA standards
+Touch targets: Minimum 44px touch areas
+Screen readers: Proper labels and hints
+Font scaling: Supports dynamic type sizing
+High contrast mode: Alternative color schemes
+Reduced motion: Respects user preference for reduced animations
+
+Brand Personality in Design
+Friendly Explorer Guide: Like having a knowledgeable local friend show you around Calm & Peaceful: Never rushed or overwhelming Authentic Discovery: Feels genuine, not algorithmic Urban Nature Connection: Bridges city life with natural spaces Community-Driven: User contributions feel valued and celebrated
+
